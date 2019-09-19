@@ -8,7 +8,6 @@ edition = "2018"
 
 [dependencies]
 hyper = "0.12"
-lazy_static = "1.4"
 reqwest = "0.9"
 rocket = { git = "https://github.com/SergioBenitez/Rocket", rev = "dcea956" }
 serenity = "0.6"

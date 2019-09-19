@@ -16,6 +16,9 @@ use std::fs::File;
 use std::{thread, vec};
 use url::Url;
 
+const MOJANG_GET_UUID: &str = "https://api.mojang.com/profiles/minecraft";
+const MOJANG_GET_HISTORY: &str = "https://api.mojang.com/user/profiles";
+
 group!({
   name: "general",
   options: {},
@@ -24,11 +27,6 @@ group!({
     unlink
   ],
 });
-
-lazy_static! {
-  static ref MOJANG_GET_UUID: Url = Url::parse("https://api.mojang.com/profiles/minecraft").unwrap();
-  static ref MOJANG_GET_HISTORY: String = "https://api.mojang.com/user/profiles/".to_string();
-}
 
 struct Handler;
 
@@ -451,9 +449,8 @@ fn rem_account(discord_id: u64) {
 fn get_mc_uuid_history(uuid: &String) -> Option<Vec<MinecraftUsernameHistory>> {
   let client = reqwest::Client::new();
   // Will panic if cannot connect to Mojang
-  let address: Url = Url::parse(&String::from(MOJANG_GET_HISTORY.to_owned() + &uuid + "/names")).unwrap();
-  let resp = client.get(address)
-    .send();
+  let address = Url::parse(&format!("{}/{}/names", MOJANG_GET_HISTORY, uuid)).unwrap();
+  let resp = client.get(address).send();
   match resp {
     Ok(mut val) => {
       return Some(serde_json::from_str(&val.text().unwrap()).unwrap());
@@ -472,9 +469,7 @@ fn get_mc_uuid(username: &String) -> Option<Vec<MinecraftUser>> {
   ]);
   println!("{:#?}", payload);
   // Will panic if cannot connect to Mojang
-  let resp = client.post(MOJANG_GET_UUID.as_ref())
-    .json(&payload)
-    .send();
+  let resp = client.post(MOJANG_GET_UUID).json(&payload).send();
   match resp {
     Ok(mut val) => {
       return Some(serde_json::from_str(&val.text().unwrap()).unwrap());
