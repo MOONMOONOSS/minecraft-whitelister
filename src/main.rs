@@ -120,7 +120,7 @@ fn get_config() -> ConfigSchema {
 }
 
 fn get_all_patrons() -> Result<Vec<Account>, mysql::Error> {
-  let pool = mysql::Pool::new(build_sql_uri()).unwrap();
+  let pool = mysql::Pool::new(build_sql_opts()).unwrap();
 
   return pool.prep_exec(r"SELECT discord_id, minecraft_uuid FROM minecrafters", ())
     .map(|result| {
@@ -174,7 +174,7 @@ fn all_patrons() -> String {
 #[get("/perk_eligibility/<minecraft_uuid>")]
 fn perk_eligibility(minecraft_uuid: String) -> String {
   // let discord_vals: DiscordConfig = get_config().discord;
-  let pool = mysql::Pool::new(build_sql_uri()).unwrap();
+  let pool = mysql::Pool::new(build_sql_opts()).unwrap();
   // let http: DiscordHttp = DiscordHttp::new_with_token(&("Bot ".to_owned() + &discord_vals.token));
 
   // Get the user
@@ -263,18 +263,23 @@ fn main() {
   }
 }
 
-fn build_sql_uri() -> String {
-  let sql_vals: SqlConfig = get_config().mysql;
-  return "mysql://".to_owned()
-    + &sql_vals.username + ":"
-    + &sql_vals.password + "@"
-    + &sql_vals.endpoint + ":"
-    + &sql_vals.port.to_string() + "/"
-    + &sql_vals.database;
+fn build_sql_opts() -> mysql::Opts {
+  let sql_vals = get_config().mysql;
+
+  let mut builder = mysql::OptsBuilder::new();
+  builder
+    .ip_or_hostname(Some(sql_vals.endpoint))
+    .tcp_port(sql_vals.port)
+    .user(Some(sql_vals.username))
+    .pass(Some(sql_vals.password))
+    .db_name(Some(sql_vals.database));
+
+  builder.into()
 }
 
 fn add_accounts(discord_id: u64, mc_user: &MinecraftUser) -> u16 {
-  let pool: mysql::Pool = mysql::Pool::new(build_sql_uri()).unwrap();
+  let pool: mysql::Pool = mysql::Pool::new(build_sql_opts()).unwrap();
+
   // Prepare the SQL statement
   let mut stmt: mysql::Stmt = pool.prepare(r"INSERT INTO minecrafters
       (discord_id, minecraft_uuid, minecraft_name)
@@ -385,7 +390,7 @@ fn sel_mc_account_with_pool(pool: &mysql::Pool, discord_id: u64) -> Option<Minec
 }
 
 fn rem_account(discord_id: u64) {
-  let pool: mysql::Pool = mysql::Pool::new(build_sql_uri()).unwrap();
+  let pool: mysql::Pool = mysql::Pool::new(build_sql_opts()).unwrap();
 
   // Retrieve MC account for whitelist removal
   let user: Option<MinecraftUser> = sel_mc_account_with_pool(&pool, discord_id);
