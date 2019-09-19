@@ -309,20 +309,18 @@ fn add_accounts(discord_id: u64, mc_user: &MinecraftUser) -> u16 {
 
   // This code is a nightmare, undocumented as well
   match ret {
-    Ok(_val) => return 0,
-    Err(ref e) => match e {
-      ::mysql::Error::MySqlError(a) => {
-        if a.message.contains("Duplicate entry") {
-          return a.code + 1;
-        }
-        return a.code;
-      },
-      _ => {
-        println!("SQL FAILURE: {}", e);
-        return 1;
+    Ok(_val) => 0,
+    Err(mysql::Error::MySqlError(a)) => {
+      if a.message.contains("Duplicate entry") {
+        return a.code + 1;
       }
+      a.code
     }
-  };
+    Err(e) => {
+      println!("SQL FAILURE: {}", e);
+      1
+    }
+  }
 }
 
 fn whitelist_account(mc_user: &MinecraftUser) -> u8 {
