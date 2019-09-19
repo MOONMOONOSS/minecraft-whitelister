@@ -1,36 +1,19 @@
 #![feature(proc_macro_hygiene, decl_macro)]
-extern crate hyper;
-#[macro_use] extern crate lazy_static;
-#[macro_use] extern crate mysql;
-extern crate url;
-extern crate rcon;
-extern crate reqwest;
-#[macro_use] extern crate rocket;
-extern crate serde;
-extern crate serde_json;
-extern crate serde_yaml;
 
-use serde::{Serialize, Deserialize};
-
+use mysql::params;
+use rocket::{get, routes};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
-
 use serenity::client::Client;
+use serenity::framework::standard::{
+  macros::{command, group},
+  Args, CommandResult, StandardFramework,
+};
 use serenity::model::channel::Message;
 use serenity::model::guild::Member;
-use serenity::prelude::{EventHandler, Context};
-use serenity::framework::standard::{
-  StandardFramework,
-  CommandResult,
-  Args,
-  macros::{
-    command,
-    group
-  }
-};
-
+use serenity::prelude::{Context, EventHandler};
 use std::fs::File;
 use std::{thread, vec};
-
 use url::Url;
 
 group!({
