@@ -148,10 +148,8 @@ fn all_patrons() -> String {
       for user in arr.iter() {
         match &user.minecraft_uuid {
           Some(id) => {
-            users.push(
-              String::from(id.to_string())
-            );
-          },
+            users.push(id.to_string());
+          }
           None => {}
         };
       }
@@ -177,7 +175,7 @@ fn all_patrons() -> String {
 fn perk_eligibility(minecraft_uuid: String) -> String {
   // let discord_vals: DiscordConfig = get_config().discord;
   let pool = mysql::Pool::new(build_sql_opts()).unwrap();
-  // let http: DiscordHttp = DiscordHttp::new_with_token(&("Bot ".to_owned() + &discord_vals.token));
+  // let http = DiscordHttp::new_with_token(&format!("Bot {}", discord_vals.token));
 
   // Get the user
   let sel_use = pool
@@ -240,7 +238,7 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
       let res: PatronResponse = PatronResponse {
         result: "failure".to_string(),
         is_patron: None,
-        reason: Some(format!("{}", why))
+        reason: Some(why.to_string()),
       };
       return serde_json::to_string(&res).unwrap();
     }
@@ -327,8 +325,8 @@ fn whitelist_account(mc_user: &MinecraftUser) -> u8 {
   let mc_servers: Vec<MinecraftServerIdentity> = get_config().minecraft.servers;
   
   for server in &mc_servers {
-    let address: String = String::from(&server.ip) + ":" + &server.port.to_string();
-    let cmd: String = String::from(format!("whitelist add {}", mc_user.name));
+    let address = format!("{}:{}", server.ip, server.port);
+    let cmd = format!("whitelist add {}", mc_user.name);
 
     match rcon::Connection::connect(address, &server.pass) {
       Ok(mut val) => issue_cmd(&mut val, &cmd),
@@ -346,8 +344,8 @@ fn dewhitelist_account(mc_user: &MinecraftUser) -> u8 {
   let mc_servers: Vec<MinecraftServerIdentity> = get_config().minecraft.servers;
   
   for server in &mc_servers {
-    let address: String = String::from(&server.ip) + ":" + &server.port.to_string();
-    let cmd: String = String::from(format!("whitelist remove {}", mc_user.name));
+    let address = format!("{}:{}", server.ip, server.port);
+    let cmd = format!("whitelist remove {}", mc_user.name);
 
     match rcon::Connection::connect(address, &server.pass) {
       Ok(mut val) => {
@@ -532,11 +530,11 @@ fn mclink(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
   if &discord_vals.channel_id == msg.channel_id.as_u64() {
     // User did not reply with their Minecraft name
     if args.is_empty() {
-      msg.reply(&ctx, format!(
-        "Please send me your Minecraft: Java Edition username.
-Example: `!mclink TheDunkel`"
-      ))?;
-      return Ok(())
+      msg.reply(
+        &ctx,
+        "Please send me your Minecraft: Java Edition username. Example: `!mclink TheDunkel`",
+      )?;
+      return Ok(());
     }
     // User sent something
     else {
@@ -547,8 +545,11 @@ Example: `!mclink TheDunkel`"
       
       // If resulting array is empty, then username is not found
       if json.is_none() {
-        msg.reply(&ctx, "Username not found. Windows 10, Mobile, and Console Editions cannot join.")?;
-        return Ok(())
+        msg.reply(
+          &ctx,
+          "Username not found. Windows 10, Mobile, and Console Editions cannot join.",
+        )?;
+        return Ok(());
       }
 
       // Overwrite json removing the Some()
@@ -584,19 +585,24 @@ Please see #minecraft_resources on how to join the Minecraft Alpha server!", jso
           return Ok(())
         },
         1062 => {
-          msg.reply(&ctx, format!("You have already linked your account.
+          msg.reply(
+            &ctx,
+            "You have already linked your account.
 You may only have one linked account at a time.
-To unlink, please type `!unlink`"))?;
-          return Ok(())
-        },
+To unlink, please type `!unlink`",
+          )?;
+        }
         1063 => {
-          msg.reply(&ctx, format!("Somebody has linked this Minecraft account already.
-Please contact Dunkel#0001 for assistance."))?;
-          return Ok(())
-        },
+          msg.reply(
+            &ctx,
+            "Somebody has linked this Minecraft account already. Please contact Dunkel#0001 for assistance.",
+          )?;
+        }
         _ => {
-          msg.reply(&ctx, format!("There was a system issue linking your profile. Please try again later."))?;
-          return Ok(())
+          msg.reply(
+            &ctx,
+            "There was a system issue linking your profile. Please try again later.",
+          )?;
         }
       };
     }
