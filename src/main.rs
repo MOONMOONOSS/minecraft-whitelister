@@ -471,7 +471,7 @@ fn rem_account(discord_id: u64) {
   }).unwrap();
 }
 
-fn get_mc_uuid_history(uuid: &String) -> Option<Vec<MinecraftUsernameHistory>> {
+fn get_mc_uuid_history(uuid: &str) -> Option<Vec<MinecraftUsernameHistory>> {
   let client = reqwest::Client::new();
   // Will panic if cannot connect to Mojang
   let address = Url::parse(&format!("{}/{}/names", MOJANG_GET_HISTORY, uuid)).unwrap();
@@ -487,7 +487,7 @@ fn get_mc_uuid_history(uuid: &String) -> Option<Vec<MinecraftUsernameHistory>> {
   }
 }
 
-fn get_mc_uuid(username: &String) -> Option<Vec<MinecraftUser>> {
+fn get_mc_uuid(username: &str) -> Option<Vec<MinecraftUser>> {
   let client = reqwest::Client::new();
   let payload = json!([
     &username
