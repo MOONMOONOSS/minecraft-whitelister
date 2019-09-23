@@ -1,5 +1,5 @@
 #![feature(proc_macro_hygiene, decl_macro)]
-use mysql::{params, Opts, OptsBuilder};
+use mysql::{params, Error::MySqlError, Opts, OptsBuilder};
 use rocket::{get, routes};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -306,20 +306,18 @@ fn add_accounts(discord_id: u64, mc_user: &MinecraftUser) -> u16 {
 
   // This code is a nightmare, undocumented as well
   match ret {
-    Ok(_val) => return 0,
-    Err(ref e) => match e {
-      ::mysql::Error::MySqlError(a) => {
-        if a.message.contains("Duplicate entry") {
-          return a.code + 1;
-        }
-        return a.code;
+    Ok(_val) => 0,
+    Err(MySqlError(e)) => {
+      if e.message.contains("Duplicate entry") {
+        return e.code + 1
       }
-      _ => {
-        println!("SQL FAILURE: {}", e);
-        return 1;
-      }
+      e.code
     },
-  };
+    Err(e) => {
+      println!("SQL FAILURE: {}", e);
+      1
+    }
+  }
 }
 
 fn whitelist_account(mc_user: &MinecraftUser) -> u8 {
