@@ -125,9 +125,8 @@ fn get_all_patrons() -> Result<Vec<Account>, mysql::Error> {
     .prep_exec(r"SELECT discord_id, minecraft_uuid FROM minecrafters", ())
     .map(|result| {
       result
-        .map(|x| x.unwrap())
         .map(|row| {
-          let (discord_id, minecraft_uuid) = mysql::from_row(row);
+          let (discord_id, minecraft_uuid) = mysql::from_row(row.unwrap());
           Account {
             discord_id: discord_id,
             minecraft_uuid: Some(minecraft_uuid),
@@ -182,17 +181,17 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
   // Possible SQL Injection here
   let sel_user: Result<Vec<Account>, mysql::Error> = pool
     .prep_exec(
-      r"SELECT discord_id, minecraft_uuid FROM minecrafters WHERE
-      minecraft_uuid = "
-        .to_owned()
-        + &minecraft_uuid,
-      (),
+      r"
+        SELECT discord_id, minecraft_uuid
+        FROM minecrafters
+        WHERE minecraft_uuid = :minecraft_uuid
+      ",
+      params! {minecraft_uuid},
     )
     .map(|result| {
       result
-        .map(|x| x.unwrap())
         .map(|row| {
-          let (discord_id, minecraft_uuid) = mysql::from_row(row);
+          let (discord_id, minecraft_uuid) = mysql::from_row(row.unwrap());
           Account {
             discord_id: discord_id,
             minecraft_uuid: minecraft_uuid,
@@ -290,10 +289,12 @@ fn add_accounts(discord_id: u64, mc_user: &MinecraftUser) -> u16 {
   // Prepare the SQL statement
   let mut stmt: mysql::Stmt = pool
     .prepare(
-      r"INSERT INTO minecrafters
-      (discord_id, minecraft_uuid, minecraft_name)
-    VALUES
-      (:discord_id, :minecraft_uuid, :minecraft_name)",
+      r"
+        INSERT INTO minecrafters
+          (discord_id, minecraft_uuid, minecraft_name)
+        VALUES
+          (:discord_id, :minecraft_uuid, :minecraft_name)
+      ",
     )
     .unwrap();
   // Execute the statement with vals
@@ -368,8 +369,11 @@ fn sel_mc_account_with_pool(pool: &mysql::Pool, discord_id: u64) -> Option<Minec
   // Prepare the SQL statement
   let mut stmt: mysql::Stmt = pool
     .prepare(
-      r"SELECT minecraft_uuid, minecraft_name FROM minecrafters WHERE
-    (discord_id = :discord_id)",
+      r"
+        SELECT minecraft_uuid, minecraft_name
+        FROM minecrafters
+        WHERE (discord_id = :discord_id)
+      ",
     )
     .unwrap();
   // Execute the statement with vals
@@ -379,9 +383,8 @@ fn sel_mc_account_with_pool(pool: &mysql::Pool, discord_id: u64) -> Option<Minec
     })
     .map(|result| {
       result
-        .map(|x| x.unwrap())
         .map(|row| {
-          let (uuid, name) = mysql::from_row(row);
+          let (uuid, name) = mysql::from_row(row.unwrap());
           MinecraftUser {
             id: uuid,
             name: name,
