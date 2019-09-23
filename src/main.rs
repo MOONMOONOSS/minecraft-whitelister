@@ -1,5 +1,4 @@
 #![feature(proc_macro_hygiene, decl_macro)]
-use lazy_static::lazy_static;
 use mysql::params;
 use rocket::{get, routes};
 use serde::{Deserialize, Serialize};
@@ -25,11 +24,8 @@ group!({
   ],
 });
 
-lazy_static! {
-  static ref MOJANG_GET_UUID: Url =
-    Url::parse("https://api.mojang.com/profiles/minecraft").unwrap();
-  static ref MOJANG_GET_HISTORY: String = "https://api.mojang.com/user/profiles/".to_string();
-}
+const MOJANG_GET_HISTORY: &str = "https://api.mojang.com/user/profiles/";
+const MOJANG_GET_UUID: &str = "https://api.mojang.com/profiles/minecraft/";
 
 struct Handler;
 
@@ -507,7 +503,7 @@ fn get_mc_uuid(username: &String) -> Option<Vec<MinecraftUser>> {
   let payload = json!([&username]);
   println!("{:#?}", payload);
   // Will panic if cannot connect to Mojang
-  let resp = client.post(MOJANG_GET_UUID.as_ref()).json(&payload).send();
+  let resp = client.post(MOJANG_GET_UUID).json(&payload).send();
   match resp {
     Ok(mut val) => {
       return Some(serde_json::from_str(&val.text().unwrap()).unwrap());
