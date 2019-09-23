@@ -1,32 +1,30 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 extern crate hyper;
-#[macro_use] extern crate lazy_static;
-#[macro_use] extern crate mysql;
-extern crate url;
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate mysql;
 extern crate rcon;
 extern crate reqwest;
-#[macro_use] extern crate rocket;
+extern crate url;
+#[macro_use]
+extern crate rocket;
 extern crate serde;
 extern crate serde_json;
 extern crate serde_yaml;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use serde_json::json;
 
 use serenity::client::Client;
+use serenity::framework::standard::{
+  macros::{command, group},
+  Args, CommandResult, StandardFramework,
+};
 use serenity::model::channel::Message;
 use serenity::model::guild::Member;
-use serenity::prelude::{EventHandler, Context};
-use serenity::framework::standard::{
-  StandardFramework,
-  CommandResult,
-  Args,
-  macros::{
-    command,
-    group
-  }
-};
+use serenity::prelude::{Context, EventHandler};
 
 use std::fs::File;
 use std::{thread, vec};
@@ -43,7 +41,8 @@ group!({
 });
 
 lazy_static! {
-  static ref MOJANG_GET_UUID: Url = Url::parse("https://api.mojang.com/profiles/minecraft").unwrap();
+  static ref MOJANG_GET_UUID: Url =
+    Url::parse("https://api.mojang.com/profiles/minecraft").unwrap();
   static ref MOJANG_GET_HISTORY: String = "https://api.mojang.com/user/profiles/".to_string();
 }
 
@@ -80,14 +79,14 @@ struct MinecraftServerIdentity {
 struct PatronAllResponse {
   result: String,
   users: Option<Vec<String>>,
-  reason: Option<String>
+  reason: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
 struct PatronResponse {
   result: String,
   is_patron: Option<bool>,
-  reason: Option<String>
+  reason: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -115,7 +114,7 @@ struct SqlConfig {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct MinecraftConfig {
-  servers: Vec<MinecraftServerIdentity>
+  servers: Vec<MinecraftServerIdentity>,
 }
 
 fn issue_cmd(conn: &mut rcon::Connection, cmd: &str) -> Option<String> {
@@ -123,12 +122,12 @@ fn issue_cmd(conn: &mut rcon::Connection, cmd: &str) -> Option<String> {
     Ok(val) => {
       println!("{}", val);
 
-      return Some(val)
-    },
+      return Some(val);
+    }
     Err(why) => {
       println!("RCON Failure: {:?}", why);
 
-      return None
+      return None;
     }
   }
 }
@@ -141,15 +140,19 @@ fn get_config() -> ConfigSchema {
 fn get_all_patrons() -> Result<Vec<Account>, mysql::Error> {
   let pool = mysql::Pool::new(build_sql_uri()).unwrap();
 
-  return pool.prep_exec(r"SELECT discord_id, minecraft_uuid FROM minecrafters", ())
+  return pool
+    .prep_exec(r"SELECT discord_id, minecraft_uuid FROM minecrafters", ())
     .map(|result| {
-      result.map(|x| x.unwrap()).map(|row| {
-        let (discord_id, minecraft_uuid) = mysql::from_row(row);
-        Account {
-          discord_id: discord_id,
-          minecraft_uuid: Some(minecraft_uuid),
-        }
-      }).collect()
+      result
+        .map(|x| x.unwrap())
+        .map(|row| {
+          let (discord_id, minecraft_uuid) = mysql::from_row(row);
+          Account {
+            discord_id: discord_id,
+            minecraft_uuid: Some(minecraft_uuid),
+          }
+        })
+        .collect()
     });
 }
 
@@ -165,25 +168,23 @@ fn all_patrons() -> String {
       for user in arr.iter() {
         match &user.minecraft_uuid {
           Some(id) => {
-            users.push(
-              String::from(id.to_string())
-            );
-          },
+            users.push(String::from(id.to_string()));
+          }
           None => {}
         };
       }
       let res: PatronAllResponse = PatronAllResponse {
         result: "success".to_string(),
         users: Some(users),
-        reason: None
+        reason: None,
       };
       return serde_json::to_string(&res).unwrap();
-    },
+    }
     Err(why) => {
       let res: PatronAllResponse = PatronAllResponse {
         result: "failure".to_string(),
         users: None,
-        reason: Some(format!("{:#?}", why))
+        reason: Some(format!("{:#?}", why)),
       };
       return serde_json::to_string(&res).unwrap();
     }
@@ -199,17 +200,25 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
   // Get the user
   // Possible SQL Injection here
   let sel_user: Result<Vec<Account>, mysql::Error> = pool
-    .prep_exec(r"SELECT discord_id, minecraft_uuid FROM minecrafters WHERE
-      minecraft_uuid = ".to_owned() + &minecraft_uuid, ())
-      .map(|result| {
-        result.map(|x| x.unwrap()).map(|row| {
+    .prep_exec(
+      r"SELECT discord_id, minecraft_uuid FROM minecrafters WHERE
+      minecraft_uuid = "
+        .to_owned()
+        + &minecraft_uuid,
+      (),
+    )
+    .map(|result| {
+      result
+        .map(|x| x.unwrap())
+        .map(|row| {
           let (discord_id, minecraft_uuid) = mysql::from_row(row);
           Account {
             discord_id: discord_id,
-            minecraft_uuid: minecraft_uuid
+            minecraft_uuid: minecraft_uuid,
           }
-        }).collect()
-      });
+        })
+        .collect()
+    });
 
   // Handle a Sql failure gracefully-ish
   match sel_user {
@@ -232,7 +241,7 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
         let res: PatronResponse = PatronResponse {
           result: "success".to_string(),
           is_patron: Some(true),
-          reason: None
+          reason: None,
         };
 
         return serde_json::to_string(&res).unwrap();
@@ -243,15 +252,15 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
       let res: PatronResponse = PatronResponse {
         result: "success".to_string(),
         is_patron: Some(false),
-        reason: None
+        reason: None,
       };
       return serde_json::to_string(&res).unwrap();
-    },
+    }
     Err(why) => {
       let res: PatronResponse = PatronResponse {
         result: "failure".to_string(),
         is_patron: None,
-        reason: Some(format!("{}", why))
+        reason: Some(format!("{}", why)),
       };
       return serde_json::to_string(&res).unwrap();
     }
@@ -261,20 +270,21 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
 fn main() {
   // Start API
   thread::spawn(move || {
-    rocket::ignite().mount("/api/v1/twitch/", routes![
-      perk_eligibility,
-      all_patrons
-    ]).launch();
+    rocket::ignite()
+      .mount("/api/v1/twitch/", routes![perk_eligibility, all_patrons])
+      .launch();
   });
   let discord_vals: DiscordConfig = get_config().discord;
 
   // Bot login
-  let mut client: Client = Client::new(&discord_vals.token, Handler)
-    .expect("Error creating client");
+  let mut client: Client =
+    Client::new(&discord_vals.token, Handler).expect("Error creating client");
 
-  client.with_framework(StandardFramework::new()
-    .configure(|c| c.prefix("!"))
-    .group(&GENERAL_GROUP));
+  client.with_framework(
+    StandardFramework::new()
+      .configure(|c| c.prefix("!"))
+      .group(&GENERAL_GROUP),
+  );
 
   // Start listening for events, single shard. Shouldn't need more than one shard
   if let Err(why) = client.start() {
@@ -285,22 +295,30 @@ fn main() {
 fn build_sql_uri() -> String {
   let sql_vals: SqlConfig = get_config().mysql;
   return "mysql://".to_owned()
-    + &sql_vals.username + ":"
-    + &sql_vals.password + "@"
-    + &sql_vals.endpoint + ":"
-    + &sql_vals.port.to_string() + "/"
+    + &sql_vals.username
+    + ":"
+    + &sql_vals.password
+    + "@"
+    + &sql_vals.endpoint
+    + ":"
+    + &sql_vals.port.to_string()
+    + "/"
     + &sql_vals.database;
 }
 
 fn add_accounts(discord_id: u64, mc_user: &MinecraftUser) -> u16 {
   let pool: mysql::Pool = mysql::Pool::new(build_sql_uri()).unwrap();
   // Prepare the SQL statement
-  let mut stmt: mysql::Stmt = pool.prepare(r"INSERT INTO minecrafters
+  let mut stmt: mysql::Stmt = pool
+    .prepare(
+      r"INSERT INTO minecrafters
       (discord_id, minecraft_uuid, minecraft_name)
     VALUES
-      (:discord_id, :minecraft_uuid, :minecraft_name)").unwrap();
+      (:discord_id, :minecraft_uuid, :minecraft_name)",
+    )
+    .unwrap();
   // Execute the statement with vals
-  let ret = stmt.execute(params!{
+  let ret = stmt.execute(params! {
     "discord_id" => &discord_id,
     "minecraft_uuid" => &mc_user.id,
     "minecraft_name" => &mc_user.name
@@ -315,18 +333,18 @@ fn add_accounts(discord_id: u64, mc_user: &MinecraftUser) -> u16 {
           return a.code + 1;
         }
         return a.code;
-      },
+      }
       _ => {
         println!("SQL FAILURE: {}", e);
         return 1;
       }
-    }
+    },
   };
 }
 
 fn whitelist_account(mc_user: &MinecraftUser) -> u8 {
   let mc_servers: Vec<MinecraftServerIdentity> = get_config().minecraft.servers;
-  
+
   for server in &mc_servers {
     let address: String = String::from(&server.ip) + ":" + &server.port.to_string();
     let cmd: String = String::from(format!("whitelist add {}", mc_user.name));
@@ -335,17 +353,17 @@ fn whitelist_account(mc_user: &MinecraftUser) -> u8 {
       Ok(mut val) => issue_cmd(&mut val, &cmd),
       Err(why) => {
         println!("Error issuing server command: {:?}", why);
-        return 1
+        return 1;
       }
     };
   }
 
-  return 0
+  return 0;
 }
 
 fn dewhitelist_account(mc_user: &MinecraftUser) -> u8 {
   let mc_servers: Vec<MinecraftServerIdentity> = get_config().minecraft.servers;
-  
+
   for server in &mc_servers {
     let address: String = String::from(&server.ip) + ":" + &server.port.to_string();
     let cmd: String = String::from(format!("whitelist remove {}", mc_user.name));
@@ -354,51 +372,60 @@ fn dewhitelist_account(mc_user: &MinecraftUser) -> u8 {
       Ok(mut val) => {
         let res: String = issue_cmd(&mut val, &cmd).unwrap();
         if res == "That player does not exist" {
-          return 2
+          return 2;
         }
-      },
+      }
       Err(why) => {
         println!("Error issuing server command: {:?}", why);
-        return 1
+        return 1;
       }
     };
   }
 
-  return 0
+  return 0;
 }
 
 fn sel_mc_account_with_pool(pool: &mysql::Pool, discord_id: u64) -> Option<MinecraftUser> {
   // Prepare the SQL statement
-  let mut stmt: mysql::Stmt = pool.prepare(r"SELECT minecraft_uuid, minecraft_name FROM minecrafters WHERE
-    (discord_id = :discord_id)").unwrap();
+  let mut stmt: mysql::Stmt = pool
+    .prepare(
+      r"SELECT minecraft_uuid, minecraft_name FROM minecrafters WHERE
+    (discord_id = :discord_id)",
+    )
+    .unwrap();
   // Execute the statement with vals
-  let res: Result<Vec<MinecraftUser>, mysql::Error> = stmt.execute(params!{
-    "discord_id" => &discord_id
-  }).map(|result| {
-    result.map(|x| x.unwrap()).map(|row| {
-      let (uuid, name) = mysql::from_row(row);
-      MinecraftUser{
-        id: uuid,
-        name: name,
-      }
-    }).collect()
-  });
+  let res: Result<Vec<MinecraftUser>, mysql::Error> = stmt
+    .execute(params! {
+      "discord_id" => &discord_id
+    })
+    .map(|result| {
+      result
+        .map(|x| x.unwrap())
+        .map(|row| {
+          let (uuid, name) = mysql::from_row(row);
+          MinecraftUser {
+            id: uuid,
+            name: name,
+          }
+        })
+        .collect()
+    });
 
   match res {
     Ok(arr) => {
       if arr.len() != 0 {
-        return Some(MinecraftUser{
+        return Some(MinecraftUser {
           id: arr[0].id.to_string(),
           name: arr[0].name.to_string(),
         });
       }
       println!("[WARN] NO PLAYER FOUND BY DISCORD ID");
 
-      return None
-    },
+      return None;
+    }
     Err(why) => {
       println!("Error while selecting accounts: {:?}", why);
-      return None
+      return None;
     }
   }
 }
@@ -411,14 +438,14 @@ fn rem_account(discord_id: u64) {
 
   if user.is_none() {
     // User was never whitelisted or manually removed
-    return
+    return;
   }
 
   // Overwrite with val
   let user: &MinecraftUser = &user.unwrap();
 
   // Attempt whitelist removal, if result is name not exist get uuid history
-  let res: u8 = dewhitelist_account(&MinecraftUser{
+  let res: u8 = dewhitelist_account(&MinecraftUser {
     id: user.id.to_string(),
     name: user.name.to_string(),
   });
@@ -430,9 +457,9 @@ fn rem_account(discord_id: u64) {
 
     if uuid_history.is_none() {
       println!("[WARN] NO UUID HISTORY FOUND");
-      return
+      return;
     }
-    
+
     // Another overwrite
     let uuid_history: Vec<MinecraftUsernameHistory> = uuid_history.unwrap();
     // Get last value in list, assumed newest username
@@ -442,7 +469,7 @@ fn rem_account(discord_id: u64) {
 
     if new_uuid.is_none() {
       println!("[WARN] UUID NOT FOUND");
-      return
+      return;
     }
 
     let new_uuid: &MinecraftUser = &new_uuid.unwrap()[0];
@@ -452,53 +479,57 @@ fn rem_account(discord_id: u64) {
 
     if res != 0 {
       println!("[WARN] FAILED TO REMOVE PLAYER FROM WHITELIST!");
-      return
+      return;
     }
   }
 
   // Prepare the SQL statement
-  let mut stmt: mysql::Stmt = pool.prepare(r"DELETE FROM minecrafters WHERE
-    (discord_id = :discord_id)").unwrap();
+  let mut stmt: mysql::Stmt = pool
+    .prepare(
+      r"DELETE FROM minecrafters WHERE
+    (discord_id = :discord_id)",
+    )
+    .unwrap();
   // Execute the statement with vals
-  stmt.execute(params!{
-    "discord_id" => &discord_id
-  }).unwrap();
+  stmt
+    .execute(params! {
+      "discord_id" => &discord_id
+    })
+    .unwrap();
 }
 
 fn get_mc_uuid_history(uuid: &String) -> Option<Vec<MinecraftUsernameHistory>> {
   let client = reqwest::Client::new();
   // Will panic if cannot connect to Mojang
-  let address: Url = Url::parse(&String::from(MOJANG_GET_HISTORY.to_owned() + &uuid + "/names")).unwrap();
-  let resp = client.get(address)
-    .send();
+  let address: Url = Url::parse(&String::from(
+    MOJANG_GET_HISTORY.to_owned() + &uuid + "/names",
+  ))
+  .unwrap();
+  let resp = client.get(address).send();
   match resp {
     Ok(mut val) => {
       return Some(serde_json::from_str(&val.text().unwrap()).unwrap());
-    },
+    }
     Err(why) => {
       println!("Error retrieving profile: {:?}", why);
-      return None
+      return None;
     }
   }
 }
 
 fn get_mc_uuid(username: &String) -> Option<Vec<MinecraftUser>> {
   let client = reqwest::Client::new();
-  let payload = json!([
-    &username
-  ]);
+  let payload = json!([&username]);
   println!("{:#?}", payload);
   // Will panic if cannot connect to Mojang
-  let resp = client.post(MOJANG_GET_UUID.as_ref())
-    .json(&payload)
-    .send();
+  let resp = client.post(MOJANG_GET_UUID.as_ref()).json(&payload).send();
   match resp {
     Ok(mut val) => {
       return Some(serde_json::from_str(&val.text().unwrap()).unwrap());
-    },
+    }
     Err(why) => {
       println!("Error retrieving profile: {:?}", why);
-      return None
+      return None;
     }
   }
 }
@@ -513,7 +544,10 @@ fn unlink(ctx: &mut Context, msg: &Message, _args: Args) -> CommandResult {
 
     rem_account(*msg.author.id.as_u64());
 
-    msg.reply(&ctx, "Your Minecraft account has been unlinked successfully.")?;
+    msg.reply(
+      &ctx,
+      "Your Minecraft account has been unlinked successfully.",
+    )?;
   }
 
   Ok(())
@@ -527,11 +561,14 @@ fn mclink(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
   if &discord_vals.channel_id == msg.channel_id.as_u64() {
     // User did not reply with their Minecraft name
     if args.is_empty() {
-      msg.reply(&ctx, format!(
-        "Please send me your Minecraft: Java Edition username.
+      msg.reply(
+        &ctx,
+        format!(
+          "Please send me your Minecraft: Java Edition username.
 Example: `!mclink TheDunkel`"
-      ))?;
-      return Ok(())
+        ),
+      )?;
+      return Ok(());
     }
     // User sent something
     else {
@@ -539,29 +576,32 @@ Example: `!mclink TheDunkel`"
 
       // Retrieve the user's current MC UUID
       let json: Option<Vec<MinecraftUser>> = get_mc_uuid(&args.single::<String>().unwrap());
-      
+
       // If resulting array is empty, then username is not found
       if json.is_none() {
-        msg.reply(&ctx, "Username not found. Windows 10, Mobile, and Console Editions cannot join.")?;
-        return Ok(())
+        msg.reply(
+          &ctx,
+          "Username not found. Windows 10, Mobile, and Console Editions cannot join.",
+        )?;
+        return Ok(());
       }
 
       // Overwrite json removing the Some()
       let json: Vec<MinecraftUser> = json.unwrap();
 
       // Refer to add_account function, act accordingly
-      let ret_val: u16 = add_accounts(
-        *msg.author.id.as_u64(),
-        &json[0]
-      );
+      let ret_val: u16 = add_accounts(*msg.author.id.as_u64(), &json[0]);
       match ret_val {
         0 => {
           // Issue requests to servers to whitelist
           let ret: u8 = whitelist_account(&json[0]);
           if ret != 0 {
-            msg.reply(&ctx, "Unable to contact one or more game servers. Please try again later.")?;
+            msg.reply(
+              &ctx,
+              "Unable to contact one or more game servers. Please try again later.",
+            )?;
             rem_account(*msg.author.id.as_u64());
-            return Ok(())
+            return Ok(());
           }
           // Assign member role
           let sender_data: Option<Member> = msg.member(&ctx.cache);
@@ -576,22 +616,35 @@ Please check #minecraft channel pins for server details, modpack, and FAQ.
 Please see #minecraft_resources on how to join the Minecraft Alpha server!", json[0].name))
             })?;
           }
-          return Ok(())
-        },
+          return Ok(());
+        }
         1062 => {
-          msg.reply(&ctx, format!("You have already linked your account.
+          msg.reply(
+            &ctx,
+            format!(
+              "You have already linked your account.
 You may only have one linked account at a time.
-To unlink, please type `!unlink`"))?;
-          return Ok(())
-        },
+To unlink, please type `!unlink`"
+            ),
+          )?;
+          return Ok(());
+        }
         1063 => {
-          msg.reply(&ctx, format!("Somebody has linked this Minecraft account already.
-Please contact Dunkel#0001 for assistance."))?;
-          return Ok(())
-        },
+          msg.reply(
+            &ctx,
+            format!(
+              "Somebody has linked this Minecraft account already.
+Please contact Dunkel#0001 for assistance."
+            ),
+          )?;
+          return Ok(());
+        }
         _ => {
-          msg.reply(&ctx, format!("There was a system issue linking your profile. Please try again later."))?;
-          return Ok(())
+          msg.reply(
+            &ctx,
+            format!("There was a system issue linking your profile. Please try again later."),
+          )?;
+          return Ok(());
         }
       };
     }
