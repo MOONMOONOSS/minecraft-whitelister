@@ -309,10 +309,10 @@ fn add_accounts(discord_id: u64, mc_user: &MinecraftUser) -> u16 {
     Ok(_val) => 0,
     Err(MySqlError(e)) => {
       if e.message.contains("Duplicate entry") {
-        return e.code + 1
+        return e.code + 1;
       }
       e.code
-    },
+    }
     Err(e) => {
       println!("SQL FAILURE: {}", e);
       1
@@ -587,9 +587,12 @@ Example: `!mclink TheDunkel`"
             sender_data.add_role(&ctx.http, 597630558733860866)?;
             msg.author.direct_message(&ctx, |m| {
               // IGNORE THIS I DON'T WANT TO USE THIS RESULT
-              m.content(format!("Your Minecraft account `{}` has been successfully linked.
+              m.content(format!(
+                "Your Minecraft account `{}` has been successfully linked.
 Please check #minecraft channel pins for server details, modpack, and FAQ.
-Please see #minecraft_resources on how to join the Minecraft Alpha server!", json[0].name))
+Please see #minecraft_resources on how to join the Minecraft Alpha server!",
+                json[0].name
+              ))
             })?;
           }
           return Ok(());
