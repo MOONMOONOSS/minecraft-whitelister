@@ -148,7 +148,7 @@ fn all_patrons() -> String {
       for user in arr.iter() {
         match &user.minecraft_uuid {
           Some(id) => {
-            users.push(format!("{}", id));
+            users.push(id.to_string());
           }
           None => {}
         };
@@ -175,7 +175,7 @@ fn all_patrons() -> String {
 fn perk_eligibility(minecraft_uuid: String) -> String {
   // let discord_vals: DiscordConfig = get_config().discord;
   let pool = mysql::Pool::new(build_sql_opts()).unwrap();
-  // let http: DiscordHttp = DiscordHttp::new_with_token(&("Bot ".to_owned() + &discord_vals.token));
+  // let http: DiscordHttp = DiscordHttp::new_with_token(&format!("Bot {}", discord_vals.token));
 
   // Get the user
   // Possible SQL Injection here
@@ -240,7 +240,7 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
       let res: PatronResponse = PatronResponse {
         result: format!("failure"),
         is_patron: None,
-        reason: Some(format!("{}", why)),
+        reason: Some(why.to_string()),
       };
       return serde_json::to_string(&res).unwrap();
     }
@@ -588,7 +588,6 @@ Example: `!mclink TheDunkel`"
             msg.author.direct_message(&ctx, |m| {
               // IGNORE THIS I DON'T WANT TO USE THIS RESULT
               m.content(format!("Your Minecraft account `{}` has been successfully linked.
-**Please note, the modded server is still manually whitelisted. Please be patient while we catch up!**
 Please check #minecraft channel pins for server details, modpack, and FAQ.
 Please see #minecraft_resources on how to join the Minecraft Alpha server!", json[0].name))
             })?;
