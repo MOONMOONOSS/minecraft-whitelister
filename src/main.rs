@@ -129,7 +129,7 @@ fn get_all_patrons() -> Result<Vec<Account>, mysql::Error> {
         .map(|row| {
           let (discord_id, minecraft_uuid) = mysql::from_row(row.unwrap());
           Account {
-            discord_id: discord_id,
+            discord_id,
             minecraft_uuid: Some(minecraft_uuid),
           }
         })
@@ -155,7 +155,7 @@ fn all_patrons() -> String {
         };
       }
       let res: PatronAllResponse = PatronAllResponse {
-        result: format!("success"),
+        result: "success".to_string(),
         users: Some(users),
         reason: None,
       };
@@ -163,7 +163,7 @@ fn all_patrons() -> String {
     }
     Err(why) => {
       let res: PatronAllResponse = PatronAllResponse {
-        result: format!("failure"),
+        result: "failure".to_string(),
         users: None,
         reason: Some(format!("{:#?}", why)),
       };
@@ -194,8 +194,8 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
         .map(|row| {
           let (discord_id, minecraft_uuid) = mysql::from_row(row.unwrap());
           Account {
-            discord_id: discord_id,
-            minecraft_uuid: minecraft_uuid,
+            discord_id,
+            minecraft_uuid,
           }
         })
         .collect()
@@ -220,7 +220,7 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
         // }
 
         let res = PatronResponse {
-          result: format!("success"),
+          result: "success".to_string(),
           is_patron: Some(true),
           reason: None,
         };
@@ -231,7 +231,7 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
       // TODO: Implement name change logic on API endpoints
 
       let res = PatronResponse {
-        result: format!("success"),
+        result: "success".to_string(),
         is_patron: Some(false),
         reason: None,
       };
@@ -239,7 +239,7 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
     }
     Err(why) => {
       let res = PatronResponse {
-        result: format!("failure"),
+        result: "failure".to_string(),
         is_patron: None,
         reason: Some(why.to_string()),
       };
@@ -386,7 +386,7 @@ fn sel_mc_account(pool: &mysql::Pool, discord_id: u64) -> Option<MinecraftUser> 
           let (uuid, name) = mysql::from_row(row.unwrap());
           MinecraftUser {
             id: uuid,
-            name: name,
+            name,
           }
         })
         .collect()
@@ -395,10 +395,7 @@ fn sel_mc_account(pool: &mysql::Pool, discord_id: u64) -> Option<MinecraftUser> 
   match res {
     Ok(arr) => {
       if !arr.is_empty() {
-        Some(MinecraftUser {
-          id: format!("{}", arr[0].id),
-          name: format!("{}", arr[0].name),
-        });
+        arr[0].id.to_string();arr[0].name.to_string();
       }
       println!("[WARN] NO PLAYER FOUND BY DISCORD ID");
 
@@ -427,8 +424,8 @@ fn rem_account(discord_id: u64) {
 
   // Attempt whitelist removal, if result is name not exist get uuid history
   let res: u8 = dewhitelist_account(&MinecraftUser {
-    id: format!("{}", user.id),
-    name: format!("{}", user.name),
+    id: user.id.to_string(),
+    name: user.name.to_string(),
   });
 
   // Removal failed, look up user
@@ -537,10 +534,7 @@ fn mclink(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
     if args.is_empty() {
       msg.reply(
         &ctx,
-        format!(
-          "Please send me your Minecraft: Java Edition username.
-Example: `!mclink TheDunkel`"
-        ),
+        "Please send me your Minecraft: Java Edition username.\nExample: `!mclink TheDunkel`".to_string(),
       )?;
       return Ok(());
     }
@@ -581,7 +575,7 @@ Example: `!mclink TheDunkel`"
           let sender_data: Option<Member> = msg.member(&ctx.cache);
           if sender_data.is_some() {
             let mut sender_data: Member = sender_data.unwrap();
-            sender_data.add_role(&ctx.http, 597630558733860866)?;
+            sender_data.add_role(&ctx.http, 597_630_558_733_860_866)?;
             msg.author.direct_message(&ctx, |m| {
               // IGNORE THIS I DON'T WANT TO USE THIS RESULT
               m.content(format!(
@@ -597,28 +591,21 @@ Please see #minecraft_resources on how to join the Minecraft Alpha server!",
         1062 => {
           msg.reply(
             &ctx,
-            format!(
-              "You have already linked your account.
-You may only have one linked account at a time.
-To unlink, please type `!unlink`"
-            ),
+            "You have already linked your account.\nYou may only have one linked account at a time.\nTo unlink, please type `!unlink`".to_string(),
           )?;
           return Ok(());
         }
         1063 => {
           msg.reply(
             &ctx,
-            format!(
-              "Somebody has linked this Minecraft account already.
-Please contact Dunkel#0001 for assistance."
-            ),
+            "Somebody has linked this Minecraft account already.\nPlease contact Dunkel#0001 for assistance.".to_string(),
           )?;
           return Ok(());
         }
         _ => {
           msg.reply(
             &ctx,
-            format!("There was a system issue linking your profile. Please try again later."),
+            "There was a system issue linking your profile. Please try again later.".to_string(),
           )?;
           return Ok(());
         }
