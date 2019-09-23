@@ -103,25 +103,26 @@ fn issue_cmd(conn: &mut rcon::Connection, cmd: &str) -> Option<String> {
     Ok(val) => {
       println!("{}", val);
 
-      return Some(val);
+      Some(val)
     }
     Err(why) => {
       println!("RCON Failure: {:?}", why);
 
-      return None;
+      None
     }
   }
 }
 
 fn get_config() -> ConfigSchema {
   let f = File::open("./config.yaml").unwrap();
-  return serde_yaml::from_reader(&f).unwrap();
+
+  serde_yaml::from_reader(&f).unwrap()
 }
 
 fn get_all_patrons() -> Result<Vec<Account>, mysql::Error> {
   let pool = mysql::Pool::new(build_sql_opts()).unwrap();
 
-  return pool
+  pool
     .prep_exec(r"SELECT discord_id, minecraft_uuid FROM minecrafters", ())
     .map(|result| {
       result
@@ -133,7 +134,7 @@ fn get_all_patrons() -> Result<Vec<Account>, mysql::Error> {
           }
         })
         .collect()
-    });
+    })
 }
 
 #[get("/perk_eligibility/all")]
@@ -145,7 +146,7 @@ fn all_patrons() -> String {
 
   match sel_user {
     Ok(arr) => {
-      for user in arr.iter() {
+      for user in &arr {
         match &user.minecraft_uuid {
           Some(id) => {
             users.push(id.to_string());
@@ -158,7 +159,7 @@ fn all_patrons() -> String {
         users: Some(users),
         reason: None,
       };
-      return serde_json::to_string(&res).unwrap();
+      serde_json::to_string(&res).unwrap()
     }
     Err(why) => {
       let res: PatronAllResponse = PatronAllResponse {
@@ -166,9 +167,9 @@ fn all_patrons() -> String {
         users: None,
         reason: Some(format!("{:#?}", why)),
       };
-      return serde_json::to_string(&res).unwrap();
+      serde_json::to_string(&res).unwrap()
     }
-  };
+  }
 }
 
 #[get("/perk_eligibility/<minecraft_uuid>")]
@@ -204,7 +205,7 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
   match sel_user {
     Ok(arr) => {
       // If we have a result, check for Discord role
-      if arr.len() > 0 {
+      if arr.is_empty() {
         // Unlink account if not a current Patron
         // Notify the user too if possible
         // if !is_subscriber {
@@ -218,33 +219,33 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
         //   });
         // }
 
-        let res: PatronResponse = PatronResponse {
+        let res = PatronResponse {
           result: format!("success"),
           is_patron: Some(true),
           reason: None,
         };
 
-        return serde_json::to_string(&res).unwrap();
+        serde_json::to_string(&res).unwrap();
       }
       // If we have no result, user may have changed their Minecraft Name
       // TODO: Implement name change logic on API endpoints
 
-      let res: PatronResponse = PatronResponse {
+      let res = PatronResponse {
         result: format!("success"),
         is_patron: Some(false),
         reason: None,
       };
-      return serde_json::to_string(&res).unwrap();
+      serde_json::to_string(&res).unwrap()
     }
     Err(why) => {
-      let res: PatronResponse = PatronResponse {
+      let res = PatronResponse {
         result: format!("failure"),
         is_patron: None,
         reason: Some(why.to_string()),
       };
-      return serde_json::to_string(&res).unwrap();
+      serde_json::to_string(&res).unwrap()
     }
-  };
+  }
 }
 
 fn main() {
@@ -336,7 +337,7 @@ fn whitelist_account(mc_user: &MinecraftUser) -> u8 {
     };
   }
 
-  return 0;
+  0
 }
 
 fn dewhitelist_account(mc_user: &MinecraftUser) -> u8 {
@@ -360,7 +361,7 @@ fn dewhitelist_account(mc_user: &MinecraftUser) -> u8 {
     };
   }
 
-  return 0;
+  0
 }
 
 fn sel_mc_account(pool: &mysql::Pool, discord_id: u64) -> Option<MinecraftUser> {
@@ -393,19 +394,19 @@ fn sel_mc_account(pool: &mysql::Pool, discord_id: u64) -> Option<MinecraftUser> 
 
   match res {
     Ok(arr) => {
-      if arr.len() != 0 {
-        return Some(MinecraftUser {
+      if !arr.is_empty() {
+        Some(MinecraftUser {
           id: format!("{}", arr[0].id),
           name: format!("{}", arr[0].name),
         });
       }
       println!("[WARN] NO PLAYER FOUND BY DISCORD ID");
 
-      return None;
+      None
     }
     Err(why) => {
       println!("Error while selecting accounts: {:?}", why);
-      return None;
+      None
     }
   }
 }
@@ -484,12 +485,10 @@ fn get_mc_uuid_history(uuid: &str) -> Option<Vec<MinecraftUsernameHistory>> {
   let address: Url = Url::parse(&format!("{}/{}/names", MOJANG_GET_HISTORY, uuid)).unwrap();
   let resp = client.get(address).send();
   match resp {
-    Ok(mut val) => {
-      return Some(serde_json::from_str(&val.text().unwrap()).unwrap());
-    }
+    Ok(mut val) => Some(serde_json::from_str(&val.text().unwrap()).unwrap()),
     Err(why) => {
       println!("Error retrieving profile: {:?}", why);
-      return None;
+      None
     }
   }
 }
@@ -501,12 +500,10 @@ fn get_mc_uuid(username: &str) -> Option<Vec<MinecraftUser>> {
   // Will panic if cannot connect to Mojang
   let resp = client.post(MOJANG_GET_UUID).json(&payload).send();
   match resp {
-    Ok(mut val) => {
-      return Some(serde_json::from_str(&val.text().unwrap()).unwrap());
-    }
+    Ok(mut val) => Some(serde_json::from_str(&val.text().unwrap()).unwrap()),
     Err(why) => {
       println!("Error retrieving profile: {:?}", why);
-      return None;
+      None
     }
   }
 }
