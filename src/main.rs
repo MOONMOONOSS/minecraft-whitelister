@@ -1,20 +1,8 @@
 #![feature(proc_macro_hygiene, decl_macro)]
-extern crate hyper;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate mysql;
-extern crate rcon;
-extern crate reqwest;
-extern crate url;
-#[macro_use]
-extern crate rocket;
-extern crate serde;
-extern crate serde_json;
-extern crate serde_yaml;
-
+use lazy_static::lazy_static;
+use mysql::params;
+use rocket::{get, routes};
 use serde::{Deserialize, Serialize};
-
 use serde_json::json;
 use serenity::{
   client::Client,
@@ -25,9 +13,7 @@ use serenity::{
   model::{channel::Message, guild::Member},
   prelude::{Context, EventHandler},
 };
-
 use std::{fs::File, thread, vec};
-
 use url::Url;
 
 group!({
