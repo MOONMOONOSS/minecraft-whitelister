@@ -365,7 +365,7 @@ fn dewhitelist_account(mc_user: &MinecraftUser) -> u8 {
   return 0;
 }
 
-fn sel_mc_account_with_pool(pool: &mysql::Pool, discord_id: u64) -> Option<MinecraftUser> {
+fn sel_mc_account(pool: &mysql::Pool, discord_id: u64) -> Option<MinecraftUser> {
   // Prepare the SQL statement
   let mut stmt: mysql::Stmt = pool
     .prepare(
@@ -416,7 +416,7 @@ fn rem_account(discord_id: u64) {
   let pool: mysql::Pool = mysql::Pool::new(build_sql_opts()).unwrap();
 
   // Retrieve MC account for whitelist removal
-  let user: Option<MinecraftUser> = sel_mc_account_with_pool(&pool, discord_id);
+  let user: Option<MinecraftUser> = sel_mc_account(&pool, discord_id);
 
   if user.is_none() {
     // User was never whitelisted or manually removed
