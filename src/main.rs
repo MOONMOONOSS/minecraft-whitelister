@@ -16,18 +16,17 @@ extern crate serde_yaml;
 use serde::{Deserialize, Serialize};
 
 use serde_json::json;
-
-use serenity::client::Client;
-use serenity::framework::standard::{
-  macros::{command, group},
-  Args, CommandResult, StandardFramework,
+use serenity::{
+  client::Client,
+  framework::standard::{
+    macros::{command, group},
+    Args, CommandResult, StandardFramework,
+  },
+  model::{channel::Message, guild::Member},
+  prelude::{Context, EventHandler},
 };
-use serenity::model::channel::Message;
-use serenity::model::guild::Member;
-use serenity::prelude::{Context, EventHandler};
 
-use std::fs::File;
-use std::{thread, vec};
+use std::{fs::File, thread, vec};
 
 use url::Url;
 
