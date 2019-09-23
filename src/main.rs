@@ -149,13 +149,13 @@ fn all_patrons() -> String {
       for user in arr.iter() {
         match &user.minecraft_uuid {
           Some(id) => {
-            users.push(String::from(id.to_string()));
+            users.push(format!("{}", id));
           }
           None => {}
         };
       }
       let res: PatronAllResponse = PatronAllResponse {
-        result: "success".to_string(),
+        result: format!("success"),
         users: Some(users),
         reason: None,
       };
@@ -163,7 +163,7 @@ fn all_patrons() -> String {
     }
     Err(why) => {
       let res: PatronAllResponse = PatronAllResponse {
-        result: "failure".to_string(),
+        result: format!("failure"),
         users: None,
         reason: Some(format!("{:#?}", why)),
       };
@@ -220,7 +220,7 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
         // }
 
         let res: PatronResponse = PatronResponse {
-          result: "success".to_string(),
+          result: format!("success"),
           is_patron: Some(true),
           reason: None,
         };
@@ -231,7 +231,7 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
       // TODO: Implement name change logic on API endpoints
 
       let res: PatronResponse = PatronResponse {
-        result: "success".to_string(),
+        result: format!("success"),
         is_patron: Some(false),
         reason: None,
       };
@@ -239,7 +239,7 @@ fn perk_eligibility(minecraft_uuid: String) -> String {
     }
     Err(why) => {
       let res: PatronResponse = PatronResponse {
-        result: "failure".to_string(),
+        result: format!("failure"),
         is_patron: None,
         reason: Some(format!("{}", why)),
       };
@@ -327,8 +327,8 @@ fn whitelist_account(mc_user: &MinecraftUser) -> u8 {
   let mc_servers: Vec<MinecraftServerIdentity> = get_config().minecraft.servers;
 
   for server in &mc_servers {
-    let address: String = String::from(&server.ip) + ":" + &server.port.to_string();
-    let cmd: String = String::from(format!("whitelist add {}", mc_user.name));
+    let address: String = format!("{}:{}", &server.ip, &server.port);
+    let cmd: String = format!("whitelist add {}", mc_user.name);
 
     match rcon::Connection::connect(address, &server.pass) {
       Ok(mut val) => issue_cmd(&mut val, &cmd),
@@ -346,8 +346,8 @@ fn dewhitelist_account(mc_user: &MinecraftUser) -> u8 {
   let mc_servers: Vec<MinecraftServerIdentity> = get_config().minecraft.servers;
 
   for server in &mc_servers {
-    let address: String = String::from(&server.ip) + ":" + &server.port.to_string();
-    let cmd: String = String::from(format!("whitelist remove {}", mc_user.name));
+    let address: String = format!("{}:{}", &server.ip, &server.port);
+    let cmd: String = format!("whitelist remove {}", mc_user.name);
 
     match rcon::Connection::connect(address, &server.pass) {
       Ok(mut val) => {
@@ -396,8 +396,8 @@ fn sel_mc_account_with_pool(pool: &mysql::Pool, discord_id: u64) -> Option<Minec
     Ok(arr) => {
       if arr.len() != 0 {
         return Some(MinecraftUser {
-          id: arr[0].id.to_string(),
-          name: arr[0].name.to_string(),
+          id: format!("{}", arr[0].id),
+          name: format!("{}", arr[0].name),
         });
       }
       println!("[WARN] NO PLAYER FOUND BY DISCORD ID");
@@ -427,8 +427,8 @@ fn rem_account(discord_id: u64) {
 
   // Attempt whitelist removal, if result is name not exist get uuid history
   let res: u8 = dewhitelist_account(&MinecraftUser {
-    id: user.id.to_string(),
-    name: user.name.to_string(),
+    id: format!("{}", user.id),
+    name: format!("{}", user.name),
   });
 
   // Removal failed, look up user
@@ -482,10 +482,7 @@ fn rem_account(discord_id: u64) {
 fn get_mc_uuid_history(uuid: &String) -> Option<Vec<MinecraftUsernameHistory>> {
   let client = reqwest::Client::new();
   // Will panic if cannot connect to Mojang
-  let address: Url = Url::parse(&String::from(
-    MOJANG_GET_HISTORY.to_owned() + &uuid + "/names",
-  ))
-  .unwrap();
+  let address: Url = Url::parse(&format!("{}/{}/names", MOJANG_GET_HISTORY, uuid)).unwrap();
   let resp = client.get(address).send();
   match resp {
     Ok(mut val) => {
