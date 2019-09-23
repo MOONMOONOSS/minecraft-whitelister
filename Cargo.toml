@@ -1,5 +1,5 @@
 [package]
-name = "moontwo_bot"
+name = "mc_whitelist_bot"
 version = "1.0.0"
 authors = ["Joseph Zurowski <Kexerval@users.noreply.github.com>"]
 edition = "2018"
