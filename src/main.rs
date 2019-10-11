@@ -580,8 +580,7 @@ fn mclink(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
               // IGNORE THIS I DON'T WANT TO USE THIS RESULT
               m.content(format!(
                 "Your Minecraft account `{}` has been successfully linked.
-Please check #minecraft channel pins for server details, modpack, and FAQ.
-Please see #minecraft_resources on how to join the Minecraft Alpha server!",
+Please check #minecraft channel pins for server details, modpack, and FAQ.",
                 json[0].name
               ))
             })?;
