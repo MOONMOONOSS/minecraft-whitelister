@@ -24,7 +24,7 @@ group!({
 });
 
 const MOJANG_GET_HISTORY: &str = "https://api.mojang.com/user/profiles/";
-const MOJANG_GET_UUID: &str = "https://api.mojang.com/profiles/minecraft/";
+const MOJANG_GET_UUID: &str = "https://api.mojang.com/profiles/minecraft";
 
 struct Handler;
 
@@ -457,7 +457,6 @@ fn mclink(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
           let sender_data: Option<Member> = msg.member(&ctx.cache);
           if sender_data.is_some() {
             let mut sender_data: Member = sender_data.unwrap();
-            sender_data.add_role(&ctx.http, 597_630_558_733_860_866)?;
             msg.author.direct_message(&ctx, |m| {
               // IGNORE THIS I DON'T WANT TO USE THIS RESULT
               m.content(format!(
