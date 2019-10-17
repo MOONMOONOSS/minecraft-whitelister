@@ -11,7 +11,7 @@ use serenity::{
   model::{channel::Message, guild::Member},
   prelude::{Context, EventHandler},
 };
-use std::{fs::File, thread, vec};
+use std::{fs::File, vec};
 use url::Url;
 
 group!({
@@ -116,24 +116,6 @@ fn get_config() -> ConfigSchema {
   let f = File::open("./config.yaml").unwrap();
 
   serde_yaml::from_reader(&f).unwrap()
-}
-
-fn get_all_patrons() -> Result<Vec<Account>, mysql::Error> {
-  let pool = mysql::Pool::new(build_sql_opts()).unwrap();
-
-  pool
-    .prep_exec(r"SELECT discord_id, minecraft_uuid FROM minecrafters", ())
-    .map(|result| {
-      result
-        .map(|row| {
-          let (discord_id, minecraft_uuid) = mysql::from_row(row.unwrap());
-          Account {
-            discord_id,
-            minecraft_uuid: Some(minecraft_uuid),
-          }
-        })
-        .collect()
-    })
 }
 
 fn main() {
@@ -456,7 +438,6 @@ fn mclink(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
           // Assign member role
           let sender_data: Option<Member> = msg.member(&ctx.cache);
           if sender_data.is_some() {
-            let mut sender_data: Member = sender_data.unwrap();
             msg.author.direct_message(&ctx, |m| {
               // IGNORE THIS I DON'T WANT TO USE THIS RESULT
               m.content(format!(
