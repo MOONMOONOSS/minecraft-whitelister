@@ -1,6 +1,5 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 use mysql::{params, Error::MySqlError, Opts, OptsBuilder};
-use rocket::{get, routes};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serenity::{
@@ -137,124 +136,7 @@ fn get_all_patrons() -> Result<Vec<Account>, mysql::Error> {
     })
 }
 
-#[get("/perk_eligibility/all")]
-fn all_patrons() -> String {
-  let mut users: Vec<String> = Vec::new();
-
-  // Get all patron users
-  let sel_user: std::result::Result<Vec<Account>, mysql::Error> = get_all_patrons();
-
-  match sel_user {
-    Ok(arr) => {
-      for user in &arr {
-        match &user.minecraft_uuid {
-          Some(id) => {
-            users.push(id.to_string());
-          }
-          None => {}
-        };
-      }
-      let res: PatronAllResponse = PatronAllResponse {
-        result: "success".to_string(),
-        users: Some(users),
-        reason: None,
-      };
-      serde_json::to_string(&res).unwrap()
-    }
-    Err(why) => {
-      let res: PatronAllResponse = PatronAllResponse {
-        result: "failure".to_string(),
-        users: None,
-        reason: Some(format!("{:#?}", why)),
-      };
-      serde_json::to_string(&res).unwrap()
-    }
-  }
-}
-
-#[get("/perk_eligibility/<minecraft_uuid>")]
-fn perk_eligibility(minecraft_uuid: String) -> String {
-  // let discord_vals: DiscordConfig = get_config().discord;
-  let pool = mysql::Pool::new(build_sql_opts()).unwrap();
-  // let http: DiscordHttp = DiscordHttp::new_with_token(&format!("Bot {}", discord_vals.token));
-
-  // Get the user
-  // Possible SQL Injection here
-  let sel_user: Result<Vec<Account>, mysql::Error> = pool
-    .prep_exec(
-      r"
-        SELECT discord_id, minecraft_uuid
-        FROM minecrafters
-        WHERE minecraft_uuid = :minecraft_uuid
-      ",
-      params! {minecraft_uuid},
-    )
-    .map(|result| {
-      result
-        .map(|row| {
-          let (discord_id, minecraft_uuid) = mysql::from_row(row.unwrap());
-          Account {
-            discord_id,
-            minecraft_uuid,
-          }
-        })
-        .collect()
-    });
-
-  // Handle a Sql failure gracefully-ish
-  match sel_user {
-    Ok(arr) => {
-      // If we have a result, check for Discord role
-      if arr.is_empty() {
-        // Unlink account if not a current Patron
-        // Notify the user too if possible
-        // if !is_subscriber {
-        //   thread::spawn(move || {
-        //     rem_account(arr[0].discord_id);
-
-        //     let _t = discord_user.direct_message(&http, |m| {
-        //       // IGNORE THIS I DON'T WANT TO USE THIS RESULT
-        //       m.content("Your subscription to MOONMOON_OW has expired and your Minecraft account has been automatically unlinked.")
-        //     });
-        //   });
-        // }
-
-        let res = PatronResponse {
-          result: "success".to_string(),
-          is_patron: Some(true),
-          reason: None,
-        };
-
-        serde_json::to_string(&res).unwrap();
-      }
-      // If we have no result, user may have changed their Minecraft Name
-      // TODO: Implement name change logic on API endpoints
-
-      let res = PatronResponse {
-        result: "success".to_string(),
-        is_patron: Some(false),
-        reason: None,
-      };
-      serde_json::to_string(&res).unwrap()
-    }
-    Err(why) => {
-      let res = PatronResponse {
-        result: "failure".to_string(),
-        is_patron: None,
-        reason: Some(why.to_string()),
-      };
-      serde_json::to_string(&res).unwrap()
-    }
-  }
-}
-
 fn main() {
-  // Start API
-  thread::spawn(move || {
-    rocket::ignite()
-      .mount("/api/v1/twitch/", routes![perk_eligibility, all_patrons])
-      .launch();
-  });
   let discord_vals: DiscordConfig = get_config().discord;
 
   // Bot login
