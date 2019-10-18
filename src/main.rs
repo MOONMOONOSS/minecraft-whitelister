@@ -1,4 +1,3 @@
-#![feature(proc_macro_hygiene, decl_macro)]
 use mysql::{params, Error::MySqlError, Opts, OptsBuilder};
 use retry::{delay::Fixed, retry, OperationResult};
 use serde::{Deserialize, Serialize};
