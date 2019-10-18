@@ -193,7 +193,7 @@ fn whitelist_account(mc_user: &MinecraftUser) -> u8 {
     let address: String = format!("{}:{}", &server.ip, &server.port);
     let cmd: String = format!("whitelist add {}", mc_user.name);
 
-    let res = retry(Fixed::from_millis(2000).take(3), || {
+    let res = retry(Fixed::from_millis(2000).take(10), || {
       match rcon::Connection::connect(&address, &server.pass) {
         Ok(mut val) => issue_cmd(&mut val, &cmd),
         Err(why) => {
@@ -218,7 +218,7 @@ fn dewhitelist_account(mc_user: &MinecraftUser) -> u8 {
     let address: String = format!("{}:{}", &server.ip, &server.port);
     let cmd: String = format!("whitelist remove {}", mc_user.name);
 
-    let res = retry(Fixed::from_millis(2000).take(3), || {
+    let res = retry(Fixed::from_millis(2000).take(10), || {
       match rcon::Connection::connect(&address, &server.pass) {
         Ok(mut val) => issue_cmd(&mut val, &cmd),
         Err(why) => {
