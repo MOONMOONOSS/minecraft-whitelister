@@ -272,7 +272,10 @@ fn sel_mc_account(pool: &mysql::Pool, discord_id: u64) -> Option<MinecraftUser> 
   match res {
     Ok(arr) => {
       if !arr.is_empty() {
-        arr[0].id.to_string();arr[0].name.to_string();
+        return Some(MinecraftUser {
+          id: arr[0].id.to_string(),
+          name: arr[0].name.to_string()
+        })
       }
       println!("[WARN] NO PLAYER FOUND BY DISCORD ID");
 
