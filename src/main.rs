@@ -1,5 +1,6 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 use mysql::{params, Error::MySqlError, Opts, OptsBuilder};
+use retry::{delay::Fixed, retry, OperationResult};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serenity::{
@@ -97,17 +98,17 @@ struct MinecraftConfig {
   servers: Vec<MinecraftServerIdentity>,
 }
 
-fn issue_cmd(conn: &mut rcon::Connection, cmd: &str) -> Option<String> {
+fn issue_cmd(conn: &mut rcon::Connection, cmd: &str) -> OperationResult<String, String> {
   match conn.cmd(cmd) {
     Ok(val) => {
       println!("{}", val);
 
-      Some(val)
+      OperationResult::Ok(val)
     }
     Err(why) => {
       println!("RCON Failure: {:?}", why);
 
-      None
+      OperationResult::Retry(format!("{:?}", why))
     }
   }
 }
@@ -192,15 +193,21 @@ fn whitelist_account(mc_user: &MinecraftUser) -> u8 {
     let address: String = format!("{}:{}", &server.ip, &server.port);
     let cmd: String = format!("whitelist add {}", mc_user.name);
 
-    match rcon::Connection::connect(address, &server.pass) {
-      Ok(mut val) => issue_cmd(&mut val, &cmd),
-      Err(why) => {
-        println!("Error issuing server command: {:?}", why);
-        return 1;
-      }
-    };
-  }
+    let res = retry(Fixed::from_millis(2000).take(3), || {
+      match rcon::Connection::connect(&address, &server.pass) {
+        Ok(mut val) => issue_cmd(&mut val, &cmd),
+        Err(why) => {
+          println!("Error connecting to server: {:?}", why);
 
+          OperationResult::Retry(format!("{:?}", why))
+        }
+      }
+    });
+
+    if res.is_err() {
+      return 1
+    }
+  }
   0
 }
 
@@ -211,18 +218,24 @@ fn dewhitelist_account(mc_user: &MinecraftUser) -> u8 {
     let address: String = format!("{}:{}", &server.ip, &server.port);
     let cmd: String = format!("whitelist remove {}", mc_user.name);
 
-    match rcon::Connection::connect(address, &server.pass) {
-      Ok(mut val) => {
-        let res: String = issue_cmd(&mut val, &cmd).unwrap();
-        if res == "That player does not exist" {
-          return 2;
+    let res = retry(Fixed::from_millis(2000).take(3), || {
+      match rcon::Connection::connect(&address, &server.pass) {
+        Ok(mut val) => issue_cmd(&mut val, &cmd),
+        Err(why) => {
+          println!("Error connecting to server: {:?}", why);
+
+          OperationResult::Retry(format!("{:?}", why))
         }
       }
-      Err(why) => {
-        println!("Error issuing server command: {:?}", why);
-        return 1;
-      }
-    };
+    });
+    // lol
+    let is_ok = &res.is_ok();
+    if *is_ok && res.unwrap() == "That player does not exist" {
+      return 2
+    }
+    if !*is_ok {
+      return 1
+    }
   }
 
   0
