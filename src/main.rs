@@ -10,7 +10,7 @@ use serenity::{
     macros::{command, group},
     Args, CommandResult, StandardFramework,
   },
-  model::{channel::Message, guild::Member},
+  model::{channel::Message, guild::Member, id::GuildId, user::User},
   prelude::{Context, EventHandler},
 };
 use std::{fs::File, vec};
@@ -30,7 +30,17 @@ const MOJANG_GET_UUID: &str = "https://api.mojang.com/profiles/minecraft";
 
 struct Handler;
 
-impl EventHandler for Handler {}
+impl EventHandler for Handler {
+  fn guild_member_removal(&self, _ctx: Context, guild: GuildId, user: User, _member_data_if_available: Option<Member>) {
+    let discord_vals: DiscordConfig = get_config().discord;
+
+    if &discord_vals.guild_id == guild.as_u64() {
+      println!("{} is leaving Mooncord", user.name);
+
+      rem_account(*user.id.as_u64())
+    }
+  }
+}
 
 fn issue_cmd(conn: &mut rcon::Connection, cmd: &str) -> OperationResult<String, String> {
   match conn.cmd(cmd) {
