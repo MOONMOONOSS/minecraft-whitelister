@@ -1,6 +1,8 @@
+pub mod models;
+
+use self::models::*;
 use mysql::{params, Error::MySqlError, Opts, OptsBuilder};
 use retry::{delay::Fixed, retry, OperationResult};
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use serenity::{
   client::Client,
@@ -29,73 +31,6 @@ const MOJANG_GET_UUID: &str = "https://api.mojang.com/profiles/minecraft";
 struct Handler;
 
 impl EventHandler for Handler {}
-
-#[derive(Debug, PartialEq, Eq)]
-struct Account {
-  discord_id: u64,
-  minecraft_uuid: Option<String>,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-struct MinecraftUser {
-  id: String,
-  name: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct MinecraftUsernameHistory {
-  name: String,
-  changed_to_at: Option<u64>,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct MinecraftServerIdentity {
-  ip: String,
-  port: u16,
-  pass: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct PatronAllResponse {
-  result: String,
-  users: Option<Vec<String>>,
-  reason: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct PatronResponse {
-  result: String,
-  is_patron: Option<bool>,
-  reason: Option<String>,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct ConfigSchema {
-  discord: DiscordConfig,
-  mysql: SqlConfig,
-  minecraft: MinecraftConfig,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct DiscordConfig {
-  guild_id: u64,
-  channel_id: u64,
-  token: String,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct SqlConfig {
-  username: String,
-  password: String,
-  endpoint: String,
-  port: u16,
-  database: String,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct MinecraftConfig {
-  servers: Vec<MinecraftServerIdentity>,
-}
 
 fn issue_cmd(conn: &mut rcon::Connection, cmd: &str) -> OperationResult<String, String> {
   match conn.cmd(cmd) {
@@ -457,7 +392,8 @@ fn mclink(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
               // IGNORE THIS I DON'T WANT TO USE THIS RESULT
               m.content(format!(
                 "Your Minecraft account `{}` has been successfully linked.
-Please check #minecraft channel pins for server details, modpack, and FAQ.",
+Please check #minecraft channel pins for server details and FAQ.
+**If you leave Mooncord for any reason, you will be removed from the whitelist**",
                 json[0].name
               ))
             })?;
