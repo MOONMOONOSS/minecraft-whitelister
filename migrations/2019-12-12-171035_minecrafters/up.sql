@@ -1,0 +1,6 @@
+CREATE TABLE minecrafters (
+    id INT UNSIGNED NOT NULL PRIMARY KEY,
+    discord_id INT UNSIGNED NOT NULL UNIQUE,
+    minecraft_uuid VARCHAR(36) NOT NULL UNIQUE,
+    minecraft_name VARCHAR(16) NOT NULL UNIQUE
+);

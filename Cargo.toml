@@ -21,3 +21,7 @@ url = "1.7.2"
 [dependencies.mysql]
 version = "16"
 features = ["ssl"]
+
+[dependencies.diesel]
+version = "1.0.0"
+features = ["mysql", "r2d2"]

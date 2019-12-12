@@ -12,6 +12,14 @@ pub struct MinecraftUser {
   pub name: String,
 }
 
+#[derive(Insertable)]
+#[table_name = "minecrafters"]
+pub struct NewMinecraftUser {
+  pub discord_id: u64,
+  pub minecraft_uuid: String,
+  pub minecraft_username: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MinecraftUsernameHistory {
   pub name: String,

@@ -1,9 +1,29 @@
+#![allow(clippy::useless_let_if_seq)]
+#[macro_use]
+extern crate diesel;
+
 pub mod models;
+pub mod schema;
 
 use self::models::*;
 use mysql::{params, Error::MySqlError, Opts, OptsBuilder};
+use diesel::{
+  mysql::MysqlConnection,
+  prelude::*,
+  r2d2::{
+    ConnectionManager,
+    Pool
+  },
+  result::{
+    Error as DieselError,
+    DatabaseErrorKind
+  },
+  RunQueryDsl,
+};
+use dotenv::dotenv;
 use retry::{delay::Fixed, retry, OperationResult};
 use serde_json::json;
+use lazy_static::lazy_static;
 use serenity::{
   client::Client,
   framework::standard::{
@@ -42,6 +62,10 @@ impl EventHandler for Handler {
   }
 }
 
+lazy_static! {
+  static ref POOL: Pool<ConnectionManager<MysqlConnection>> = establish_connection();
+}
+
 fn issue_cmd(conn: &mut rcon::Connection, cmd: &str) -> OperationResult<String, String> {
   match conn.cmd(cmd) {
     Ok(val) => {
@@ -55,6 +79,17 @@ fn issue_cmd(conn: &mut rcon::Connection, cmd: &str) -> OperationResult<String, 
       OperationResult::Retry(format!("{:?}", why))
     }
   }
+}
+
+fn establish_connection() -> Pool<ConnectionManager<MysqlConnection>> {
+  dotenv().ok();
+
+  let db_url = env::var("DATABASE_URL").expect("DATABASE_URL env var must be set");
+  let manager = ConnectionManager::<MysqlConnection>::new(db_url);
+  
+  Pool::builder()
+    .build(manager)
+    .expect("Failed to create pool")
 }
 
 fn get_config() -> ConfigSchema {
@@ -82,6 +117,7 @@ fn main() {
   }
 }
 
+/*
 fn build_sql_opts() -> Opts {
   let sql_vals: SqlConfig = get_config().mysql;
   let mut builder = OptsBuilder::new();
@@ -93,41 +129,22 @@ fn build_sql_opts() -> Opts {
     .db_name(Some(sql_vals.database));
   builder.into()
 }
+*/
 
 fn add_accounts(discord_id: u64, mc_user: &MinecraftUser) -> u16 {
-  let pool: mysql::Pool = mysql::Pool::new(build_sql_opts()).unwrap();
-  // Prepare the SQL statement
-  let mut stmt: mysql::Stmt = pool
-    .prepare(
-      r"
-        INSERT INTO minecrafters
-          (discord_id, minecraft_uuid, minecraft_name)
-        VALUES
-          (:discord_id, :minecraft_uuid, :minecraft_name)
-      ",
-    )
-    .unwrap();
-  // Execute the statement with vals
-  let ret = stmt.execute(params! {
-    "discord_id" => &discord_id,
-    "minecraft_uuid" => &mc_user.id,
-    "minecraft_name" => &mc_user.name
-  });
+  let connection = POOL.get().unwrap();
 
-  // This code is a nightmare, undocumented as well
-  match ret {
-    Ok(_val) => 0,
-    Err(MySqlError(e)) => {
-      if e.message.contains("Duplicate entry") {
-        return e.code + 1;
-      }
-      e.code
-    }
-    Err(e) => {
-      println!("SQL FAILURE: {}", e);
-      1
-    }
+  let newUser = NewMinecraftUser {
+    discord_id,
+    &mc_user.id,
+    &mc_user.name,
   }
+
+  diesel::insert_into(minecrafters::table)
+    .values(&newUser)
+    .execute(&connection)?;
+
+  1 // for now
 }
 
 fn whitelist_account(mc_user: &MinecraftUser) -> u8 {
