@@ -362,8 +362,8 @@ fn mclink(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
                 // IGNORE THIS I DON'T WANT TO USE THIS RESULT
                 m.content(format!(
                   "Your Minecraft account `{}` has been successfully linked.
-  Please check #minecraft channel pins for server details and FAQ.
-  **If you leave Mooncord for any reason, you will be removed from the whitelist**",
+Please check #minecraft channel pins for server details and FAQ.
+**If you leave Mooncord for any reason, you will be removed from the whitelist**",
                   json[0].name
                 ))
               })?;
