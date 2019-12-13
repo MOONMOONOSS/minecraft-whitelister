@@ -1,9 +1,20 @@
+use super::schema::minecrafters;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Account {
   pub discord_id: u64,
   pub minecraft_uuid: Option<String>,
+}
+
+// Consolidate this and MinecraftUser ?
+
+#[derive(Queryable)]
+pub struct FullMCUser {
+  pub id: u64,
+  pub discord_id: u64,
+  pub minecraft_uuid: String,
+  pub minecraft_name: String,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -17,7 +28,7 @@ pub struct MinecraftUser {
 pub struct NewMinecraftUser {
   pub discord_id: u64,
   pub minecraft_uuid: String,
-  pub minecraft_username: String,
+  pub minecraft_name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,7 +61,6 @@ pub struct PatronResponse {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct ConfigSchema {
   pub discord: DiscordConfig,
-  pub mysql: SqlConfig,
   pub minecraft: MinecraftConfig,
 }
 
