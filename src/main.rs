@@ -195,11 +195,11 @@ fn sel_mc_account(_discord_id: u64) -> Option<MinecraftUser> {
   Some(mc_user)
 }
 
-fn rem_account(discordid: u64) -> bool {
+fn rem_account(_discord_id: u64) -> bool {
   use self::schema::minecrafters::dsl::*;
 
   // Retrieve MC account for whitelist removal
-  let user: Option<MinecraftUser> = sel_mc_account(discordid);
+  let user: Option<MinecraftUser> = sel_mc_account(_discord_id);
 
   if user.is_none() {
     // User was never whitelisted or manually removed
@@ -249,7 +249,7 @@ fn rem_account(discordid: u64) -> bool {
   }
 
   let connection = POOL.get().unwrap();
-  let num_del = diesel::delete(minecrafters.filter(discord_id.eq(discord_id)))
+  let num_del = diesel::delete(minecrafters.filter(discord_id.eq(_discord_id)))
     .execute(&connection)
     .expect("Error deleting user by discord id");
 
@@ -261,6 +261,7 @@ fn get_mc_uuid_history(uuid: &str) -> Option<Vec<MinecraftUsernameHistory>> {
   // Will panic if cannot connect to Mojang
   let address: Url = Url::parse(&format!("{}/{}/names", MOJANG_GET_HISTORY, uuid)).unwrap();
   let resp = client.get(address).send();
+
   match resp {
     Ok(mut val) => Some(serde_json::from_str(&val.text().unwrap()).unwrap()),
     Err(why) => {
@@ -274,8 +275,10 @@ fn get_mc_uuid(username: &str) -> Option<Vec<MinecraftUser>> {
   let client = reqwest::Client::new();
   let payload = json!([&username]);
   println!("{:#?}", payload);
+
   // Will panic if cannot connect to Mojang
   let resp = client.post(MOJANG_GET_UUID).json(&payload).send();
+
   match resp {
     Ok(mut val) => Some(serde_json::from_str(&val.text().unwrap()).unwrap()),
     Err(why) => {
@@ -312,95 +315,105 @@ fn unlink(ctx: &mut Context, msg: &Message, _args: Args) -> CommandResult {
 #[command]
 fn mclink(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
   let discord_vals: DiscordConfig = get_config().discord;
+  let sender_id = *msg.author.id.as_u64();
 
   // Check if channel is minecraft whitelisting channel (and not a direct message)
-  if &discord_vals.channel_id == msg.channel_id.as_u64() {
-    // User did not reply with their Minecraft name
-    if args.is_empty() {
-      msg.reply(
-        &ctx,
-        "Please send me your Minecraft: Java Edition username.\nExample: `!mclink TheDunkel`".to_string(),
-      )?;
-      return Ok(());
-    }
-    // User sent something
-    else {
-      // TODO: Check if user is whitelisted already before querying to Mojang
+  if &discord_vals.channel_id != msg.channel_id.as_u64() {
+    return Ok(());
+  }
 
-      // Retrieve the user's current MC UUID
-      let json: Option<Vec<MinecraftUser>> = get_mc_uuid(&args.single::<String>().unwrap());
+  // User did not reply with their Minecraft name
+  if args.is_empty() {
+    msg.reply(
+      &ctx,
+      "Please send me your Minecraft: Java Edition username.\nExample: `!mclink TheDunkel`".to_string(),
+    )?;
+    return Ok(());
+  }
+  
+  let existing_user = sel_mc_account(sender_id);
 
-      // If resulting array is empty, then username is not found
-      if json.is_none() {
-        msg.reply(
-          &ctx,
-          "Username not found. Windows 10, Mobile, and Console Editions cannot join.",
-        )?;
+  if existing_user.is_some() {
+    msg.reply(
+      &ctx,
+      "You have already linked your account.\nYou may only have one linked account at a time.\nTo unlink, please type `!unlink`".to_string(),
+    )?;
+    return Ok(());
+  }
+
+  // Retrieve the user's current MC UUID
+  let json: Option<Vec<MinecraftUser>> = get_mc_uuid(&args.single::<String>().unwrap());
+
+  // If resulting array is empty, then username is not found
+  if json.is_none() {
+    msg.reply(
+      &ctx,
+      "Username not found. Windows 10, Mobile, and Console Editions cannot join.",
+    )?;
+    return Ok(());
+  }
+
+  // Overwrite json removing the Some()
+  let json: Vec<MinecraftUser> = json.unwrap();
+
+  let mut response = "There was a system issue linking your profile. Please try again later.";
+
+  // Refer to add_account function, act accordingly
+  let ret_val = add_accounts(sender_id, &json[0]);
+
+  match ret_val {
+    Ok(1) => {
+      // Issue requests to servers to whitelist
+      let ret: u8 = whitelist_account(&json[0], true);
+
+      if ret == 0 {
+        let sender_data: Option<Member> = msg.member(&ctx.cache);
+        if sender_data.is_some() {
+          msg.author.direct_message(&ctx, |m| {
+            // IGNORE THIS I DON'T WANT TO USE THIS RESULT
+            m.content(format!(
+              "Your Minecraft account `{}` has been successfully linked.
+Please check #minecraft channel pins for server details and FAQ.
+**If you leave Mooncord for any reason, you will be removed from the whitelist**",
+              json[0].name
+            ))
+          })?;
+        }
+
         return Ok(());
       }
 
-      // Overwrite json removing the Some()
-      let json: Vec<MinecraftUser> = json.unwrap();
+      response = "Unable to contact one or more game servers. Please try again later.";
+      rem_account(sender_id);
+    }
 
-      let mut response = "There was a system issue linking your profile. Please try again later.";
+    Err(DieselError::DatabaseError(e, info)) => {
+      let box_ptr = Box::into_raw(info);
+      let box_val = unsafe {
+        Box::from_raw(box_ptr)
+      };
+      let msg = box_val.message().to_string();
 
-      // Refer to add_account function, act accordingly
-      let ret_val = add_accounts(*msg.author.id.as_u64(), &json[0]);
-
-      match ret_val {
-        Ok(1) => {
-          // Issue requests to servers to whitelist
-          let ret: u8 = whitelist_account(&json[0], true);
-          if ret != 0 {
-            response = "Unable to contact one or more game servers. Please try again later.";
-            rem_account(*msg.author.id.as_u64());
-          } else {
-            // Assign member role
-            let sender_data: Option<Member> = msg.member(&ctx.cache);
-            if sender_data.is_some() {
-              msg.author.direct_message(&ctx, |m| {
-                // IGNORE THIS I DON'T WANT TO USE THIS RESULT
-                m.content(format!(
-                  "Your Minecraft account `{}` has been successfully linked.
-Please check #minecraft channel pins for server details and FAQ.
-**If you leave Mooncord for any reason, you will be removed from the whitelist**",
-                  json[0].name
-                ))
-              })?;
-            }
-
-            return Ok(());
+      match e {
+        DatabaseErrorKind::UniqueViolation => {
+          // whack
+          if msg.contains("discord_id") {
+            response = "You have already linked your account.\nYou may only have one linked account at a time.\nTo unlink, please type `!unlink`";
+          } else if msg.contains("minecraft_uuid") {
+            response = "Somebody has linked this Minecraft account already.\nPlease contact Dunkel#0001 for assistance.";
           }
-        }
-        Err(DieselError::DatabaseError(e, info)) => {
-          let box_ptr = Box::into_raw(info);
-          let box_val = unsafe {
-            Box::from_raw(box_ptr)
-          };
-          let msg = box_val.message().to_string();
-
-          match (e) {
-            DatabaseErrorKind::UniqueViolation => {
-              // whack
-              if msg.contains("discord_id") {
-                response = "You have already linked your account.\nYou may only have one linked account at a time.\nTo unlink, please type `!unlink`";
-              } else if msg.contains("minecraft_uuid") {
-                response = "Somebody has linked this Minecraft account already.\nPlease contact Dunkel#0001 for assistance.";
-              }
-            }
-            _ => { }
-          };
         }
         _ => { }
       };
-
-      msg.reply(
-        &ctx,
-        response.to_string(),
-      )?;
-      return Ok(());
     }
-  }
+
+    _ => { }
+  };
+
+  msg.reply(
+    &ctx,
+    response.to_string(),
+  )?;
 
   Ok(())
 }
