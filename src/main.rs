@@ -137,7 +137,7 @@ fn add_accounts(discordid: u64, mc_user: &MinecraftUser) -> QueryResult<usize> {
   res
 }
 
-fn whitelist_account(mc_user: &MinecraftUser, towhitelist: bool) -> u8 {
+fn whitelist_account(mc_user: &MinecraftUser, towhitelist: bool) -> Result<(), Error> {
   let mc_servers: Vec<MinecraftServerIdentity> = get_config().minecraft.servers;
 
   for server in &mc_servers {
@@ -159,15 +159,15 @@ fn whitelist_account(mc_user: &MinecraftUser, towhitelist: bool) -> u8 {
     let ok = &res.is_ok();
 
     if *ok && res.unwrap() == "That player does not exist" {
-      return 2
+      return Err(WhiteListError::New())
     }
 
     if !*ok {
-      return 1
+      return Err(WhiteListError::New())
     }
   }
 
-  0
+  Ok(())
 }
 
 fn sel_mc_account(_discord_id: u64) -> Option<MinecraftUser> {
@@ -388,11 +388,8 @@ Please check #minecraft channel pins for server details and FAQ.
     }
 
     Err(DieselError::DatabaseError(e, info)) => {
-      let box_ptr = Box::into_raw(info);
-      let box_val = unsafe {
-        Box::from_raw(box_ptr)
-      };
-      let msg = box_val.message().to_string();
+      let msg = info.message().to_string();
+      println!("{}", msg);
 
       match e {
         DatabaseErrorKind::UniqueViolation => {
