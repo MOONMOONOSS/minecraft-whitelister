@@ -2,12 +2,6 @@ discord:
   guild_id: 1234
   channel_id: 1234
   token: token
-mysql:
-  username: username
-  password: password
-  endpoint: endpoint
-  port: 3306
-  database: db
 minecraft:
   servers:
     -
