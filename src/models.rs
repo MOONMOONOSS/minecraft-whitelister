@@ -1,6 +1,5 @@
 use super::schema::minecrafters;
 use serde::{Deserialize, Serialize};
-use std::{error:Error, fmt}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Account {
@@ -8,7 +7,7 @@ pub struct Account {
   pub minecraft_uuid: Option<String>,
 }
 
-#[derive(Queryable, Identifiable)]
+#[derive(Queryable)]
 pub struct FullMCUser {
   pub id: u64,
   pub discord_id: u64,
@@ -82,14 +81,4 @@ pub struct SqlConfig {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct MinecraftConfig {
   pub servers: Vec<MinecraftServerIdentity>,
-}
-
-
-#[derive(Debug)]
-struct WhitelistError;
-
-impl fmt::Display for WhitelistError {
-  fn fmt(&self, f &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "")
-  }
 }

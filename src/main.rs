@@ -4,8 +4,13 @@ extern crate diesel;
 
 pub mod models;
 pub mod schema;
+pub mod error;
 
 use self::models::*;
+use self::error::{
+  Error as MCWhitelistError,
+  WhitelistErrorKind,
+};
 use diesel::{
   mysql::MysqlConnection,
   prelude::*,
@@ -137,7 +142,7 @@ fn add_accounts(discordid: u64, mc_user: &MinecraftUser) -> QueryResult<usize> {
   res
 }
 
-fn whitelist_account(mc_user: &MinecraftUser, towhitelist: bool) -> Result<(), Error> {
+fn whitelist_account(mc_user: &MinecraftUser, towhitelist: bool) -> Result<(), MCWhitelistError> {
   let mc_servers: Vec<MinecraftServerIdentity> = get_config().minecraft.servers;
 
   for server in &mc_servers {
@@ -159,11 +164,13 @@ fn whitelist_account(mc_user: &MinecraftUser, towhitelist: bool) -> Result<(), E
     let ok = &res.is_ok();
 
     if *ok && res.unwrap() == "That player does not exist" {
-      return Err(WhiteListError::New())
+      let err_msg = "Tried to unwhitelist unexisting player";
+      return Err(MCWhitelistError::WhitelistError(WhitelistErrorKind::NonExistingPlayer, Box::new(err_msg.to_string())))
     }
 
     if !*ok {
-      return Err(WhiteListError::New())
+      let err_msg = "RCON Connection error";
+      return Err(MCWhitelistError::WhitelistError(WhitelistErrorKind::RCONConnectionError, Box::new(err_msg.to_string())))
     }
   }
 
@@ -210,42 +217,49 @@ fn rem_account(_discord_id: u64) -> bool {
   let user: &MinecraftUser = &user.unwrap();
 
   // Attempt whitelist removal, if result is name not exist get uuid history
-  let res: u8 = whitelist_account(&MinecraftUser {
+  let res = whitelist_account(&MinecraftUser {
     id: user.id.to_string(),
     name: user.name.to_string(),
   }, false);
 
-  // Removal failed, look up user
-  if res == 2 {
-    println!("[Log] Performing deep search to remove player from whitelist");
-    let uuid_history: Option<Vec<MinecraftUsernameHistory>> = get_mc_uuid_history(&user.id);
+  match res {
+    Err(MCWhitelistError::WhitelistError(WhitelistErrorKind::NonExistingPlayer, _)) => {
+      println!("[Log] Performing deep search to remove player from whitelist");
+      let uuid_history: Option<Vec<MinecraftUsernameHistory>> = get_mc_uuid_history(&user.id);
 
-    if uuid_history.is_none() {
-      println!("[WARN] NO UUID HISTORY FOUND");
-      return false;
+      if uuid_history.is_none() {
+        println!("[WARN] NO UUID HISTORY FOUND");
+        return false;
+      }
+
+      // Another overwrite
+      let uuid_history: Vec<MinecraftUsernameHistory> = uuid_history.unwrap();
+      // Get last value in list, assumed newest username
+      let new_name: &MinecraftUsernameHistory = uuid_history.last().unwrap();
+      // Get UUID from new user
+      let new_uuid: Option<Vec<MinecraftUser>> = get_mc_uuid(&new_name.name);
+
+      if new_uuid.is_none() {
+        println!("[WARN] UUID NOT FOUND");
+        return false;
+      }
+
+      let new_uuid: &MinecraftUser = &new_uuid.unwrap()[0];
+
+      // Issue whitelist removal command
+      let retry_res = whitelist_account(&new_uuid, false);
+
+      match retry_res {
+        Ok(()) => { }
+
+        Err(_) => {
+          println!("[WARN] FAILED TO REMOVE PLAYER FROM WHITELIST!");
+          return false;
+        }
+      }
     }
-
-    // Another overwrite
-    let uuid_history: Vec<MinecraftUsernameHistory> = uuid_history.unwrap();
-    // Get last value in list, assumed newest username
-    let new_name: &MinecraftUsernameHistory = uuid_history.last().unwrap();
-    // Get UUID from new user
-    let new_uuid: Option<Vec<MinecraftUser>> = get_mc_uuid(&new_name.name);
-
-    if new_uuid.is_none() {
-      println!("[WARN] UUID NOT FOUND");
-      return false;
-    }
-
-    let new_uuid: &MinecraftUser = &new_uuid.unwrap()[0];
-
-    // Issue whitelist removal command
-    let res: u8 = whitelist_account(&new_uuid, false);
-
-    if res != 0 {
-      println!("[WARN] FAILED TO REMOVE PLAYER FROM WHITELIST!");
-      return false;
-    }
+    
+    _ => { }
   }
 
   let connection = POOL.get().unwrap();
@@ -300,7 +314,7 @@ fn unlink(ctx: &mut Context, msg: &Message, _args: Args) -> CommandResult {
     let success = rem_account(*msg.author.id.as_u64());
 
     if !success {
-      response = "You were never whitelisted or there was an error trying to unwhitelist you.";
+      response = "You were never whitelisted or there was an error trying to remove you from the whitelist.";
     }
 
     msg.reply(
@@ -364,27 +378,32 @@ fn mclink(ctx: &mut Context, msg: &Message, mut args: Args) -> CommandResult {
   match ret_val {
     Ok(1) => {
       // Issue requests to servers to whitelist
-      let ret: u8 = whitelist_account(&json[0], true);
+      let ret = whitelist_account(&json[0], true);
 
-      if ret == 0 {
-        let sender_data: Option<Member> = msg.member(&ctx.cache);
-        if sender_data.is_some() {
-          msg.author.direct_message(&ctx, |m| {
-            // IGNORE THIS I DON'T WANT TO USE THIS RESULT
-            m.content(format!(
-              "Your Minecraft account `{}` has been successfully linked.
+      match ret {
+        Ok(()) => {
+          let sender_data: Option<Member> = msg.member(&ctx.cache);
+
+          if sender_data.is_some() {
+            msg.author.direct_message(&ctx, |m| {
+              // IGNORE THIS I DON'T WANT TO USE THIS RESULT
+              m.content(format!(
+                "Your Minecraft account `{}` has been successfully linked.
 Please check #minecraft channel pins for server details and FAQ.
 **If you leave Mooncord for any reason, you will be removed from the whitelist**",
-              json[0].name
-            ))
-          })?;
+                json[0].name
+              ))
+            })?;
+          }
+
+          return Ok(())
         }
 
-        return Ok(());
+        Err(_) => {
+          response = "Unable to contact one or more game servers. Please try again later.";
+          rem_account(sender_id);
+        }
       }
-
-      response = "Unable to contact one or more game servers. Please try again later.";
-      rem_account(sender_id);
     }
 
     Err(DieselError::DatabaseError(e, info)) => {

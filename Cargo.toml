@@ -26,4 +26,4 @@ features = ["ssl"]
 
 [dependencies.diesel]
 version = "1"
-features = ["mysql"]
+features = ["mysql", "r2d2"]
