@@ -1,4 +1,3 @@
-#![allow(clippy::useless_let_if_seq)]
 #[macro_use]
 extern crate diesel;
 
@@ -16,7 +15,7 @@ use diesel::{
   prelude::*,
   r2d2::{
     ConnectionManager,
-    Pool
+    Pool,
   },
   result::{
     Error as DieselError,
@@ -124,7 +123,15 @@ fn main() {
 fn add_accounts(discordid: u64, mc_user: &MinecraftUser) -> QueryResult<usize> {
   use self::schema::minecrafters;
 
-  let connection = POOL.get().unwrap();
+  let connection;
+  let conn_res = POOL.get();
+
+  if conn_res.is_err() {
+    let msg = "Unable to connect to the MySQL server";
+    return Err(DieselError::DatabaseError(DatabaseErrorKind::UnableToSendCommand, Box::new(msg.to_string())))
+  }
+
+  connection = conn_res.unwrap();
 
   let mcid = &mc_user.id;
   let mcname = &mc_user.name;
@@ -161,17 +168,28 @@ fn whitelist_account(mc_user: &MinecraftUser, towhitelist: bool) -> Result<(), M
       }
     });
 
-    let ok = &res.is_ok();
+    let err_msg;
+    let err_kind;
 
-    if *ok && res.unwrap() == "That player does not exist" {
-      let err_msg = "Tried to unwhitelist unexisting player";
-      return Err(MCWhitelistError::WhitelistError(WhitelistErrorKind::NonExistingPlayer, Box::new(err_msg.to_string())))
+    let non_existing = "That player does not exist";
+
+    match res {
+      Ok(msg) => {
+        if msg != non_existing {
+          continue;
+        }
+
+        err_msg = "Tried to unwhitelist unexisting player";
+        err_kind = WhitelistErrorKind::NonExistingPlayer;
+      }
+
+      Err(_) => {
+        err_msg = "RCON Connection error";
+        err_kind = WhitelistErrorKind::RCONConnectionError;
+      }
     }
 
-    if !*ok {
-      let err_msg = "RCON Connection error";
-      return Err(MCWhitelistError::WhitelistError(WhitelistErrorKind::RCONConnectionError, Box::new(err_msg.to_string())))
-    }
+    return Err(MCWhitelistError::WhitelistError(err_kind, Box::new(err_msg.to_string())))
   }
 
   Ok(())
@@ -418,6 +436,9 @@ Please check #minecraft channel pins for server details and FAQ.
           } else if msg.contains("minecraft_uuid") {
             response = "Somebody has linked this Minecraft account already.\nPlease contact Dunkel#0001 for assistance.";
           }
+        }
+        DatabaseErrorKind::UnableToSendCommand => {
+          response = "Unable to contact MySQL server. Please try again later.";
         }
         _ => { }
       };
